@@ -3,7 +3,7 @@
   <arg name="rviz" default="true" doc="Visualize results with RViz."/>
   <arg name="config" default="" doc="The path on disk to the config"/>
   <arg name="pc_topic" default="/ct_icp/pointcloud" doc="The topic of the point cloud as input to ct_icp odometry" />
-  <arg name="debug_print" default="false" doc="Whether to print debug information of the node" />
+  <arg name="debug_print" default="true" doc="Whether to print debug information of the node" />
 
   <!-- TODO: Replace by config -->
   <arg name="timestamp_property_name" default="timestamp" />
