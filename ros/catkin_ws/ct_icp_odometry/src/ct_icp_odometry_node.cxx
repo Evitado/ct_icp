@@ -32,6 +32,7 @@ struct Config {
     ct_icp::OdometryOptions odometry_options = ct_icp::OdometryOptions::DefaultDrivingProfile();
     bool output_state_on_failure = true;
     std::string failure_output_dir = "/tmp";
+    std::string map_output_dir = "/home";
     ct_icp::TIME_UNIT unit = ct_icp::SECONDS;
     bool check_timestamp_consistency = true;
     double expected_frame_time_sec = 0.1;
@@ -43,6 +44,7 @@ std::unique_ptr<ct_icp::Odometry> odometry_ptr = nullptr;
 std::atomic<double> previous_timestamp;
 std::atomic<bool> is_initialized = false;
 bool debug_print = false;
+int save_map_count = 0;
 
 slam::frame_id_t frame_id = 0;
 std::mutex registration_mutex;
@@ -285,6 +287,19 @@ void RegisterNewFrameCallback(const sensor_msgs::PointCloud2Ptr &pc_ptr) {
     log_value("avg_duration_iter", summary.icp_summary.avg_duration_iter);
     log_value("duration_total", summary.icp_summary.duration_total);
     log_value("avg_duration_neighborhood", summary.icp_summary.avg_duration_neighborhood);
+    
+    
+    if (save_map_count%10 == 0){
+        fs::path map_save_dir(config.map_output_dir);
+        auto map_path = map_save_dir / "cticp_map.ply";
+        if (debug_print)
+        ROS_INFO_STREAM("Saving Map to " << map_path);
+        auto pc = odometry_ptr->GetMapPointCloud();
+        pc->RegisterFieldsFromSchema();
+        auto mapper = slam::PLYSchemaMapper::BuildDefaultFromBufferCollection(pc->GetCollection());
+        slam::WritePLY(map_path, *pc, mapper);
+    }
+    save_map_count++;
 }
 
 /* ------------------------------------------------------------------------------------------------------------------ */
@@ -315,7 +330,15 @@ void InitializeNode(ros::NodeHandle &public_nh, ros::NodeHandle &nh) {
             FIND_OPTION(node, config, failure_output_dir, std::string)
             FIND_OPTION(node, config, output_state_on_failure, bool)
             FIND_OPTION(node, config, check_timestamp_consistency, bool)
+            FIND_OPTION(node, config, map_output_dir, std::string)
+            
             config.unit = ct_icp::TimeUnitFromNode(node, "unit");
+
+            fs::path map_save_dir(config.map_output_dir);
+            if(!exists(map_save_dir)){
+                create_directories(map_save_dir);
+                ROS_INFO_STREAM("Map directory didnot exsist and is created at "<< map_save_dir);
+            }
 
         } catch (...) {
             ROS_ERROR_STREAM("Error while loading the config from path: `" << config_path << "`");
